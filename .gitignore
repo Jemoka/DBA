@@ -1,0 +1,7 @@
+data/*
+/wandb/
+env/*
+models/*
+.DS_Store
+__pycache__/
+#.*
