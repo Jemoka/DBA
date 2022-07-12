@@ -17,14 +17,18 @@ from sklearn.cluster import KMeans
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.ensemble import RandomForestClassifier
 
+# stats
+from scipy.stats import kstest, pearsonr
+
 # plotting
 import seaborn as sns
 sns.set_theme()
 import matplotlib.pyplot as plt
 
 # get all dirs
-CONTROL_DIR = "./data/wordinfo/alignedpitt-7-11/control/"
-DEMENTIA_DIR = "./data/wordinfo/alignedpitt-7-11/dementia/"
+CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/control/"
+DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/dementia/"
+OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12.csv"
 
 # get val test split
 TEST_SPLIT = 0.1
@@ -69,7 +73,7 @@ def process_targets(files):
         if silence_duration > 0:
             voice_silence_ratio = speech_duration/silence_duration
         else:
-            voice_silence_ratio = 100 # this is almost max
+            voice_silence_ratio = 0 # this is almost max
 
         # # pause metadata (not mentinoed)
         # inter_pause_distance = df.diff().iloc[1:]["start"]
@@ -119,8 +123,83 @@ data.reset_index(drop=True, inplace=True)
 # shuffle again
 data = data.sample(frac=1)
 
-# normalize the data
-# data.iloc(axis=1)[:-1] = data.iloc(axis=1)[:-1].apply(lambda x:(x-x.mean())/x.std(), axis=0)
+
+
+
+#### Statisics and Simple Analysis ####
+
+# data
+data.to_csv(OUT_DIR, index=False)
+
+# analyzer tools
+# mean and std
+def describe_variables(data, variables):
+    # get AD results and calculate
+    results_ad = data[data.target==1][variables].apply(lambda x:(x.mean(), x.std()), axis=0)
+    # reset index
+    results_ad.index = ["mean", "std"]
+    # transpose
+    results_ad = results_ad.transpose()
+
+    # get control results and calculate
+    results_control = data[data.target==0][variables].apply(lambda x:(x.mean(), x.std()), axis=0)
+    # reset index
+    results_control.index = ["mean", "std"]
+    # transponse
+    results_control = results_control.transpose()
+
+    return results_ad, results_control
+
+# statistical difference
+def analyze_variables(data, variables):
+    # get AD results and calculate
+    results_ad = data[data.target==1][variables]
+    # get control results and calculate
+    results_control = data[data.target==0][variables]
+
+    # collect results
+    ks = {}
+    pc = {}
+
+    # for each variable, perform ks test
+    for variable in variables:
+        # get variable
+        ad = results_ad[variable]
+        control = results_control[variable]
+        # perform test
+        _, p = kstest(ad, control)
+        # dump
+        ks[variable] = p
+
+    # for each variable, coorelate with results
+    for variable in variables:
+        # get variable
+        ad = results_ad[variable]
+        control = results_control[variable]
+        # create targets
+        targets = [1 for _ in range(len(ad))] + [0 for _ in range(len(control))]
+        # perform test
+        _, p = pearsonr(pd.concat([ad, control]), targets)
+        # dump
+        pc[variable] = p
+
+    return {"kstest": ks, "pearson": pc}
+
+# analyze wang results
+WANG = ["silence_duration", "speech_duration", "voice_silence_ratio", "verbal_rate"] 
+wang_results_ad, wang_results_control = describe_variables(data, WANG)
+wang_stat_results = analyze_variables(data, WANG)
+
+wang_stat_results
+
+# analyze pause results
+PAUSE = ["max_pause", "mean_pause", "pause_std", "verbal_rate"] 
+pause_results_ad, pause_results_control = describe_variables(data, PAUSE)
+pause_stat_results = analyze_variables(data, PAUSE)
+
+pause_stat_results
+
+#### ML and Classification ####
 
 # train data
 train_data = data.iloc[:-int(TEST_SPLIT*len(data))]
@@ -164,13 +243,7 @@ clsf = RandomForestClassifier(criterion="entropy")
 clsf = clsf.fit(in_data, out_data)
 clsf.score(in_test, out_test)
 
-# data
-data.to_csv("./data/wordinfo/alignedpitt-7-1.csv", index=False)
-
-print(data[data.target==1].verbal_rate.mean(), ",",
-      data[data.target==1].verbal_rate.std())
-
-####### trash ######
+#### trash ####
 
 # # run PCA
 # pca = PCA(n_components=2)
