@@ -50,7 +50,7 @@ run = wandb.init(project="DBA", entity="jemoka", config=CONFIG, mode="disabled")
 config = run.config
 
 # load dataset dir
-DATASET = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13" # TBD
+DATASET = "./data/wordinfo/pitt-07-13" # TBD
 
 # calculate other dirs
 control_dir = os.path.join(DATASET, "control/*.csv")
