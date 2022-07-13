@@ -38,7 +38,7 @@ CONFIG = {
     "topicmodeling_model": "glove-wiki-gigaword-50",
     "topicmodeling_size": 50,
     "epochs": 10,
-    "lr": 5e-6,
+    "lr": 5e-5,
     "batch_size": 1
 }
 

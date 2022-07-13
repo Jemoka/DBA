@@ -8,7 +8,7 @@ import torch.nn.functional as F
 # new model!
 class Model(Module):
 
-    def __init__(self, num_layers=2, hidden_dim=128, dropout=0.1, meta_size=2, vocab_size=50, out_size=2):
+    def __init__(self, num_layers=2, hidden_dim=32, dropout=0, meta_size=2, vocab_size=50, out_size=2):
         # initalize
         super().__init__()
 
