@@ -39,11 +39,11 @@ CONFIG = {
     "topicmodeling_size": 50,
     "epochs": 3,
     "lr": 3e-3,
-    "batch_size": 4
+    "batch_size": 2
 }
 
 # set up the run
-# run = wandb.init(project="DBC", entity="jemoka", config=CONFIG)
+# run = wandb.init(project="DBA", entity="jemoka", config=CONFIG)
 run = wandb.init(project="DBA", entity="jemoka", config=CONFIG, mode="disabled")
 
 # get the configuration
