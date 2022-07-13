@@ -37,9 +37,9 @@ DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 CONFIG = {
     "topicmodeling_model": "glove-wiki-gigaword-50",
     "topicmodeling_size": 50,
-    "epochs": 3,
-    "lr": 3e-3,
-    "batch_size": 2
+    "epochs": 10,
+    "lr": 5e-6,
+    "batch_size": 1
 }
 
 # set up the run
@@ -118,6 +118,9 @@ wv_model = downloader.load(config.topicmodeling_model)
 # load the model and optimizer
 model = Model().to(DEVICE)
 optim = AdamW(model.parameters(), lr=config.lr)
+
+# watch model
+run.watch(model)
 
 ### training utilities ###
 # define validation tools
@@ -265,5 +268,5 @@ for e in range(config.epochs):
             })
 
 # save model
-torch.save(model, f"./models/{run.name}")
+# torch.save(model, f"./models/{run.name}")
 

@@ -27,7 +27,7 @@ class Model(Module):
         _, (h_n, _) = self.lstm(batch)
 
         # get final hidden layer
-        final_hidden = F.relu(h_n[-1])
+        final_hidden = h_n[-1]
 
         # pass to output
         out = self.out(final_hidden)
