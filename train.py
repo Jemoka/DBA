@@ -203,7 +203,7 @@ for e in range(config.epochs):
     print(f"Training epoch {e}...")
 
     # for each batch
-    for batch_id, i in enumerate(tqdm(range(0, len(train_data), config.batch_size))):
+    for batch_id, i in enumerate(tqdm(range(0, len(train_data)-config.batch_size, config.batch_size))):
 
         batch = train_data[i:i+config.batch_size]
 
@@ -238,7 +238,7 @@ for e in range(config.epochs):
         # for every 10 batches, randomly perform a single validation sample
         if batch_id % 10 == 0:
             # get the batch
-            val_batch = random.randint(0, len(test_data)//config.batch_size)
+            val_batch = random.randint(0, (len(test_data)//config.batch_size)-1)
             val_batch = test_data[val_batch*config.batch_size:val_batch*config.batch_size + config.batch_size]
 
             # seperate in and out data
