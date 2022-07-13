@@ -97,6 +97,7 @@ for checkfile in files:
     for tier, result in aligned_results:
         # set the start as zero
         start = None
+        lasttoken = None
         # split tokens
         for token in result.split(" "):
             # if pause, calculate pause
@@ -112,13 +113,16 @@ for checkfile in files:
                         start = res[0]
                         offset += start-lastend # append the differenc
                     # append result
-                    wordinfo.append((res[0]-offset, res[1]-offset))
+                    wordinfo.append((lasttoken, res[0]-offset, res[1]-offset))
                     # set lastend
                     lastend = res[1]
 
+            # save last token
+            lasttoken = token.replace("+","").replace("<","").replace(">","")
+
     wordframe = pd.DataFrame(wordinfo)
     try:
-        wordframe.columns=["start", "end"]
+        wordframe.columns=["word", "start", "end"]
     except ValueError:
         continue
 

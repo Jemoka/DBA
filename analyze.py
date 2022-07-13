@@ -19,6 +19,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
 
 # stats
 from scipy.stats import kstest, pearsonr
@@ -29,9 +30,10 @@ sns.set_theme()
 import matplotlib.pyplot as plt
 
 # get all dirs
-CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/control/"
-DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/dementia/"
-OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12.csv"
+CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13/control/"
+DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13/dementia/"
+# OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.csv"
+OUT_DIR = None
 
 # get val test split
 TEST_SPLIT = 0.1
@@ -54,9 +56,9 @@ def process_targets(files):
         # read the csv
         df = pd.read_csv(f, index_col=0)
         # name columns
-        df.columns = ["start", "end"]
+        df.columns = ["word", "start", "end"]
         # change units to seconds
-        df = df/1000
+        df[["start", "end"]] = df[["start", "end"]]/1000
 
         # get pauses
         diffs = pd.DataFrame({"start":df["end"], "end":df["start"].shift(-1)})
@@ -78,6 +80,9 @@ def process_targets(files):
         verbal_rate = (len(df) / duration)
         silence_duration = pauses.sum()
         speech_duration = (df.end-df.start).sum()
+
+        # vocabulary data -- Wang 2019
+        total_words = len(set(df["word"]))
 
         if silence_duration > 0:
             voice_silence_ratio = speech_duration/silence_duration
@@ -116,6 +121,7 @@ def process_targets(files):
             "max_pause": max_pause,
             "mean_pause": mean_pause,
             "pause_std": pause_std,
+            "total_words": total_words,
             "duration": duration,
             "verbal_rate": verbal_rate,
             "verbal_rate_trend": fit[0],
@@ -158,11 +164,11 @@ data.reset_index(drop=True, inplace=True)
 # shuffle again
 data = data.sample(frac=1)
 
-
 #### Statisics and Simple Analysis ####
 
 # data
-data.to_csv(OUT_DIR, index=False)
+if OUT_DIR:
+    data.to_csv(OUT_DIR, index=False)
 
 # analyzer tools
 # mean and std
@@ -223,15 +229,10 @@ WANG = ["silence_duration", "speech_duration", "voice_silence_ratio", "verbal_ra
 wang_results_ad, wang_results_control = describe_variables(data, WANG)
 wang_stat_results = analyze_variables(data, WANG)
 
-wang_stat_results
-
 # analyze pause results
 PAUSE = ["max_pause", "mean_pause", "pause_std", "verbal_rate"] 
 pause_results_ad, pause_results_control = describe_variables(data, PAUSE)
 pause_stat_results = analyze_variables(data, PAUSE)
-
-analyze_variables(data, ["max_pause", "verbal_rate"])
-
 
 #### ML and Classification ####
 
@@ -272,19 +273,35 @@ clsf = RandomForestClassifier()
 clsf = clsf.fit(in_data[["verbal_rate", "silence_duration"]], out_data)
 clsf.score(in_test[["verbal_rate", "silence_duration"]], out_test)
 
+# KNN
+clsf = KNeighborsClassifier(5)
+clsf = clsf.fit(in_data[["verbal_rate", "silence_duration"]], out_data)
+clsf.score(in_test[["verbal_rate", "silence_duration"]], out_test)
+
+
 # plot
-feature_plot = sns.scatterplot(data=in_concat, x="max_pause", y="verbal_rate", hue=out_concat, style="split")
+feature_plot = sns.scatterplot(data=in_concat, x="verbal_rate", y="silence_duration", hue=out_concat, style="split")
 plt.show()
 
-#### trash ####
 
-# # run PCA
-# pca = PCA(n_components=2)
-# in_pca = pca.fit(in_data)
-# data_pca = pca.transform(in_concat.iloc(axis=1)[:-1])
 
-# # plot PCA
-# pca_plot = sns.scatterplot(x=data_pca[:,0], y=data_pca[:,1], hue=out_concat, style=in_concat.split)
-# pca_plot.set(xlabel="PCA1", ylabel="PCA2")
-# plt.show()
+#### PCA ####
+
+# collect pca data
+norm_data = data.drop(columns=["verbal_rate_interpolated", "pause_rate_interpolated"])
+norm_data.iloc(axis=1)[:-1] = norm_data.iloc(axis=1)[:-1].apply(lambda x:(x-x.mean())/x.std(), axis=0)
+
+# run PCA
+pca = PCA(n_components=2)
+in_pca = pca.fit(norm_data)
+data_pca = pca.transform(norm_data)
+
+# plot PCA
+pca_plot = sns.scatterplot(x=data_pca[:,0], y=data_pca[:,1], hue=out_concat, style=in_concat.split)
+pca_plot.set(xlabel="PCA1", ylabel="PCA2")
+plt.show()
+
+
+
+
 
