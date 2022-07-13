@@ -100,5 +100,5 @@ for checkfile in files:
         continue
 
     # write the final output file
-    wordframe.to_csv(repath_file(checkfile, OUTDIR).replace("cha", "csv"))
+    # wordframe.to_csv(repath_file(checkfile, OUTDIR).replace("cha", "csv"))
 

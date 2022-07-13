@@ -1,12 +1,15 @@
 # glob
+from contextlib import ContextDecorator
 import glob
 
 # pathing
 import os
 from pathlib import Path
 
-# pandas
+# pandas and numpy
 import pandas as pd
+import numpy as np
+from pandas._libs.tslibs.period import DIFFERENT_FREQ
 from pandas.core.indexers.utils import length_of_indexer
 from transformers.utils.dummy_pt_objects import DPTForSemanticSegmentation
 
@@ -40,6 +43,10 @@ dementia_files = glob.glob(os.path.join(DEMENTIA_DIR, "*.csv"))
 # collect targets
 # for each file
 def process_targets(files):
+    # verbal rate interpolation rate for trend
+    VERBAL_SHIFT = 50
+    PAUSE_SHIFT = 1
+
     result = []
 
     # for each file
@@ -52,9 +59,11 @@ def process_targets(files):
         df = df/1000
 
         # get pauses
-        diffs = (df["start"].shift(-1)-df["end"])
-        diffs.iloc[-1] = 0
-        pauses = diffs[diffs!=0]
+        diffs = pd.DataFrame({"start":df["end"], "end":df["start"].shift(-1)})
+        diffs["pauses"] = diffs.end-diffs.start
+
+        diffs = diffs.dropna()
+        pauses = diffs[diffs.pauses!=0].pauses
 
         # pause data -- Antonsson 2021
         max_pause = pauses.max()
@@ -81,6 +90,27 @@ def process_targets(files):
         # max_inter_pause_distance = inter_pause_distance.max()
         # inter_pause_distance_std = inter_pause_distance.std()
 
+        # verbal rate trend calculation
+        rate_interpolated = ((VERBAL_SHIFT+1)/(df["end"].shift(-VERBAL_SHIFT)-df["start"])).dropna()
+        if len(rate_interpolated) > 0:
+            try: 
+                fit = np.polyfit(x=range(len(rate_interpolated)), y=rate_interpolated, deg=1)
+            except:
+                fit = [0,0]
+        else:
+            fit = [0,0]
+
+        # pause rate trend calculation
+        pause_rate = len(pauses)/duration
+        pause_rate_interpolated = ((PAUSE_SHIFT+1)/(diffs["end"].shift(-PAUSE_SHIFT)-diffs["start"])).dropna()
+        if len(pause_rate_interpolated) > 0:
+            try: 
+                pause_fit = np.polyfit(x=range(len(pause_rate_interpolated)), y=pause_rate_interpolated, deg=1)
+            except:
+                pause_fit = [0,0]
+        else:
+            pause_fit = [0,0]
+
         # create metadata column
         data = pd.Series({
             "max_pause": max_pause,
@@ -88,6 +118,11 @@ def process_targets(files):
             "pause_std": pause_std,
             "duration": duration,
             "verbal_rate": verbal_rate,
+            "verbal_rate_trend": fit[0],
+            "verbal_rate_interpolated": rate_interpolated,
+            "pause_rate": pause_rate,
+            "pause_rate_trend": pause_fit[0],
+            "pause_rate_interpolated": pause_rate_interpolated,
             "silence_duration": silence_duration,
             "speech_duration": speech_duration,
             "voice_silence_ratio": voice_silence_ratio,
@@ -122,8 +157,6 @@ data = pd.concat([dementia, control])
 data.reset_index(drop=True, inplace=True)
 # shuffle again
 data = data.sample(frac=1)
-
-
 
 
 #### Statisics and Simple Analysis ####
@@ -197,7 +230,8 @@ PAUSE = ["max_pause", "mean_pause", "pause_std", "verbal_rate"]
 pause_results_ad, pause_results_control = describe_variables(data, PAUSE)
 pause_stat_results = analyze_variables(data, PAUSE)
 
-pause_stat_results
+analyze_variables(data, ["max_pause", "verbal_rate"])
+
 
 #### ML and Classification ####
 
@@ -230,18 +264,17 @@ out_concat = pd.concat([out_data, out_test])
 
 # random classifier test
 clsf = SVC()
-clsf.fit(in_data, out_data)
-clsf.score(in_test, out_test)
-
-# feature selection with ANOVA
-k_best = SelectKBest(f_classif, k=2)
-k_best.fit(in_data, out_data)
-best_features = k_best.get_feature_names_out()
+clsf = clsf.fit(in_data[["verbal_rate", "silence_duration"]], out_data)
+clsf.score(in_test[["verbal_rate", "silence_duration"]], out_test)
 
 # random forest
-clsf = RandomForestClassifier(criterion="entropy")
-clsf = clsf.fit(in_data, out_data)
-clsf.score(in_test, out_test)
+clsf = RandomForestClassifier()
+clsf = clsf.fit(in_data[["verbal_rate", "silence_duration"]], out_data)
+clsf.score(in_test[["verbal_rate", "silence_duration"]], out_test)
+
+# plot
+feature_plot = sns.scatterplot(data=in_concat, x="max_pause", y="verbal_rate", hue=out_concat, style="split")
+plt.show()
 
 #### trash ####
 
