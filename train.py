@@ -198,10 +198,12 @@ def pack_prep_data(in_data, wv_model):
     return in_packed
 
 # go through epochs
-for _ in range(config.epochs):
+for e in range(config.epochs):
+
+    print(f"Training epoch {e}...")
 
     # for each batch
-    for batch_id, i in enumerate(range(0, len(train_data), config.batch_size)):
+    for batch_id, i in enumerate(tqdm(range(0, len(train_data), config.batch_size))):
 
         batch = train_data[i:i+config.batch_size]
 
