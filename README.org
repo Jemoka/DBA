@@ -1,5 +1,3 @@
-* DementiaBank Acoustics Project
+* DBA
 
-The [[id:94061F9C-89F4-4103-B763-F02D43AD21D0][DementiaBank Acoustics Project]] is a working title for an MFA-align task for AD detection. This is a work-in-progress.
-
-Please refer to [[https://www.jemoka.com/posts/kbhdementiabank_acoustics_project/][the Lab Notes]] for the current details of the project.
+An automatic data extraction and classification system for DB, AB, and CHILDES.

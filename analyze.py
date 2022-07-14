@@ -229,6 +229,9 @@ WANG = ["silence_duration", "speech_duration", "voice_silence_ratio", "verbal_ra
 wang_results_ad, wang_results_control = describe_variables(data, WANG)
 wang_stat_results = analyze_variables(data, WANG)
 
+wang_results_ad
+wang_results_control
+
 # analyze pause results
 PAUSE = ["max_pause", "mean_pause", "pause_std", "verbal_rate"] 
 pause_results_ad, pause_results_control = describe_variables(data, PAUSE)
