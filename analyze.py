@@ -292,10 +292,17 @@ out_concat = pd.concat([out_data, out_test])
 in_data_syntax = np.array(in_data["syntax_padded"].to_list())
 in_test_syntax = np.array(in_test["syntax_padded"].to_list())
 
+# and then, append the rest of the integer feature data
+in_features = in_data.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded"])
+in_features = np.concatenate((in_features, in_data_syntax), axis=1)
+
+test_features = in_test.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded"])
+test_features = np.concatenate((test_features, in_test_syntax), axis=1)
+
 # random forest
 clsf = RandomForestClassifier()
-clsf = clsf.fit(in_data_syntax, out_data)
-clsf.score(in_test_syntax, out_test)
+clsf = clsf.fit(in_features, out_data)
+clsf.score(test_features, out_test)
 
 # decision tree
 clsf = DecisionTreeClassifier()
@@ -330,7 +337,7 @@ plt.show()
 
 # run PCA
 pca = PCA(n_components=2)
-in_pca = pca.fit_transform(in_data_syntax)
+in_pca = pca.fit_transform(in_features)
 # data_pca = pca.transform(norm_data)
 
 # plot PCA

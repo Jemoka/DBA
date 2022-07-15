@@ -23,11 +23,11 @@ repath_file = lambda file_path, new_dir: os.path.join(new_dir, pathlib.Path(file
 CLAN_PATH=""
 
 # file to check
-DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/dementia"
+DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/ADReSS2020-07-15/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/ADReSS2020-07-15/dementia"
 
-DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/control"
+DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/ADReSS2020-07-15/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/ADReSS2020-07-15/control"
 
 # tier to read
 READ="*PAR"
