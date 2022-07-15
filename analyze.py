@@ -14,12 +14,12 @@ from pandas.core.indexers.utils import length_of_indexer
 from transformers.utils.dummy_pt_objects import DPTForSemanticSegmentation
 
 # random tools from sklearn
-from sklearn.svm import SVC
+from sklearn.svm import SVC, SVR
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, plot_tree
 from sklearn.neighbors import KNeighborsClassifier
 
 # stats
@@ -34,8 +34,8 @@ sns.set_theme()
 import matplotlib.pyplot as plt
 
 # get all dirs
-CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/control/"
-DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/dementia/"
+CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/control/"
+DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/dementia/"
 # OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.csv"
 OUT_DIR = None
 
@@ -53,7 +53,7 @@ dementia_lookup = os.path.join(DEMENTIA_DIR, "tokens.bin")
 
 # collect targets
 # for each file
-def process_targets(files, syntax):
+def process_targets(files, meta):
     # verbal rate interpolation rate for trend
     VERBAL_SHIFT = 50
     PAUSE_SHIFT = 1
@@ -61,7 +61,7 @@ def process_targets(files, syntax):
     result = []
 
     # for each file
-    for f,s in zip(sorted(files), sorted(syntax)):
+    for f,s in zip(sorted(files), sorted(meta)):
         # read the csv
         df = pd.read_csv(f, index_col=0)
         # name columns
@@ -117,9 +117,11 @@ def process_targets(files, syntax):
         except ZeroDivisionError:
             pause_rate = total_words
 
-        # decode the syntax output
+        # decode the meta output
         with open(s, 'rb') as df:
-            syntax_parsed = pickle.load(df)
+            meta_parsed = pickle.load(df)
+            syntax_parsed = meta_parsed["tokens"]
+            mmse = meta_parsed["mmse"]
 
         # flatten output
         syntax_parsed_flattened = np.array(sum(syntax_parsed, []))
@@ -138,7 +140,8 @@ def process_targets(files, syntax):
             "silence_duration": silence_duration,
             "speech_duration": duration,
             "voice_silence_ratio": pause_rate,
-            "syntax": syntax_parsed_flattened.reshape(s*x)
+            "syntax": syntax_parsed_flattened.reshape(s*x),
+            "mmse": mmse
         })
 
         # append data
@@ -293,11 +296,20 @@ in_data_syntax = np.array(in_data["syntax_padded"].to_list())
 in_test_syntax = np.array(in_test["syntax_padded"].to_list())
 
 # and then, append the rest of the integer feature data
-in_features = in_data.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded"])
+in_features = in_data.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded", "mmse"])
 in_features = np.concatenate((in_features, in_data_syntax), axis=1)
 
-test_features = in_test.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded"])
+test_features = in_test.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded", "mmse"])
 test_features = np.concatenate((test_features, in_test_syntax), axis=1)
+
+# Task test 1: use syntax to regress for MMSE
+reg = DecisionTreeRegressor()
+reg = reg.fit(in_data_syntax, in_data.mmse)
+reg.score(in_test_syntax, in_test.mmse)
+
+reg = SVR(kernel="poly")
+reg = reg.fit(in_data_syntax, in_data.mmse)
+reg.score(in_test_syntax, in_test.mmse)
 
 # random forest
 clsf = RandomForestClassifier()
@@ -336,13 +348,13 @@ plt.show()
 # norm_data.iloc(axis=1)[:-1] = norm_data.iloc(axis=1)[:-1].apply(lambda x:(x-x.mean())/x.std(), axis=0)
 
 # run PCA
-pca = PCA(n_components=2)
-in_pca = pca.fit_transform(in_features)
+pca = PCA(n_components=1)
+in_pca = pca.fit_transform(in_data_syntax)
 # data_pca = pca.transform(norm_data)
 
 # plot PCA
-pca_plot = sns.scatterplot(x=in_pca[:,0], y=in_pca[:,1], hue=out_data)
-pca_plot.set(xlabel="PCA1", ylabel="PCA2")
+pca_plot = sns.scatterplot(x=in_pca[:,0], y=in_data.mmse)
+pca_plot.set(xlabel="PCA1", ylabel="MMSE")
 plt.show()
 
 

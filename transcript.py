@@ -14,6 +14,7 @@ from collections import defaultdict
 import pickle
 
 from pandas.core.generic import _align_as_utc
+from seaborn import relational
 
 # Oneliner of directory-based glob and replace
 globase = lambda path, statement: glob.glob(os.path.join(path, statement))
@@ -23,17 +24,22 @@ repath_file = lambda file_path, new_dir: os.path.join(new_dir, pathlib.Path(file
 CLAN_PATH=""
 
 # file to check
-DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/ADReSS2020-07-15/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/ADReSS2020-07-15/dementia"
+DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/dementia"
 
-DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/ADReSS2020-07-15/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/ADReSS2020-07-15/control"
+DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/control"
 
 # tier to read
 READ="*PAR"
 
 # create a defaultdict to encode syntax features
 syntax_tokens = defaultdict(lambda:len(syntax_tokens))
+# create a defaultdict to encode relational features
+relational_tokens = defaultdict(lambda:len(relational_tokens))
+# create a defaultdict to encode pos features
+pos_tokens = defaultdict(lambda:len(pos_tokens))
+
 
 def do(DATADIR, OUTDIR):
 
@@ -220,44 +226,59 @@ def do(DATADIR, OUTDIR):
                     if (i.split("|")[-1] != "ROOT") and
                     (i.split("|")[-1] !="PUNCT")]
 
+            # extract sentence parse tree information
+            parse = (i[1] for i in line)
+
             try:
+                # extract parts of speech informiatn
+                pos = [mor_line[i[0][0]-1] for i in line]
+
                 # replace lookup information with parts of speech
                 # parsed from the mor line
-                line = [[mor_line[i[0][0]-1],
-                        mor_line[i[0][1]-1],
-                        i[1]] for i in line]
+                line = [(mor_line[i[0][0]-1],
+                         mor_line[i[0][1]-1],
+                         i[1]) for i in line]
             except IndexError:
                 # replace lookup information with parts of speech
                 # parsed from the mor line
                 # NOF is a token that's not found
-                line = ["NOF", "NOF", "NOF"]
+                line = []
+                pos = [] 
 
             # return the prepared line
-            return line
+            return line, parse, pos
 
         # parse the entire database to generate the equivalent of
-                        # feature #4 by LubetichSagae which combines #s 2,3,4
-                        # together
+        # feature #4 by LubetichSagae which combines #s 2,3,4
+        # together
         extracted_syntactic_features = []
+        extracted_relational_features = []
+        extracted_pos_features = []
 
         for mor, gra in zip(aligned_mor, aligned_gra):
                         # calculate mor line
             mor_line = parse_mor(mor)
                         # calculate feature
-            feature = parse_gra(gra, mor_line)
+            syntax, relation, pos  = parse_gra(gra, mor_line)
 
             # append to list
-            extracted_syntactic_features.append(feature)
+            extracted_syntactic_features.append(syntax)
+            extracted_relational_features.append(relation)
+            extracted_pos_features.append(pos)
 
-        # we encode it using the global defaultdict, which will add to the dictionary if it
-                        # doesn't exist already
-        encoded_syntax_features = [[[syntax_tokens[k] for k in j] for j in i] for i in extracted_syntactic_features]
+        # we encode everything the global defaultdict, which will add to the dictionary if it
+        # doesn't exist already
+        encoded_syntax_features = [[syntax_tokens[j] for j in i] for i in extracted_syntactic_features]
+        encoded_relational_features = [[relational_tokens[j] for j in i] for i in extracted_relational_features]
+        encoded_pos_features = [[pos_tokens[j] for j in i] for i in extracted_pos_features]
 
         # save the syntax features
         with open(repath_file(checkfile, OUTDIR).replace(".cha", "-meta.bin"), "wb") as df:
                         # dump the syntax features
-            pickle.dump({"tokens": encoded_syntax_features,
-                        "mmse": MMSE}, df)
+            pickle.dump({"syntax": encoded_syntax_features,
+                         "relational": encoded_relational_features,
+                         "pos": encoded_pos_features,
+                         "mmse": MMSE}, df)
 
         # write the final output file
         wordframe.to_csv(repath_file(checkfile, OUTDIR).replace(".cha", "-wordframe.csv"))
@@ -265,7 +286,10 @@ def do(DATADIR, OUTDIR):
         # dump the syntax token lookup table
         with open(os.path.join(OUTDIR, "tokens.bin"), "wb") as df:
             # dump the frozen syntax features
-            pickle.dump(dict(syntax_tokens), df)
+            # we reverse the dictionary as the typical usage
+            pickle.dump({"syntax": {syntax_tokens[k] : k for k in syntax_tokens},
+                         "relational": {relational_tokens[k] : k for k in relational_tokens},
+                         "pos": {pos_tokens[k] : k for k in pos_tokens}}, df)
 
 do(DATADIR_AD, OUTDIR_AD)
 do(DATADIR_C, OUTDIR_C)
