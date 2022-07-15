@@ -40,7 +40,7 @@ DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/de
 OUT_DIR = None
 
 # get val test split
-TEST_SPLIT = 0.3
+TEST_SPLIT = 0.1
 
 # get all files
 control_files = glob.glob(os.path.join(CONTROL_DIR, "*.csv"))
@@ -88,17 +88,19 @@ def process_targets(files, syntax):
         # verbal rate data -- Wang 2019, Lindsay 2021
         verbal_rate = (len(df) / duration)
         silence_duration = pauses.sum()
-        speech_duration = (df.end-df.start).sum()
 
         # vocabulary data -- Wang 2019
         total_words = len(set(df["word"]))
 
+        # speech rate data -- Beltrami 2014
+        phonation_time = total_words/duration
+
         if silence_duration > 0:
-            voice_silence_ratio = speech_duration/silence_duration
+            voice_silence_ratio = (df.end-df.start).sum()/silence_duration
         else:
             voice_silence_ratio = 0 # this is almost max
 
-        # verbal rate trend calculation
+        # verbal rate trend calculation -- author's invention
         rate_interpolated = ((VERBAL_SHIFT+1)/(df["end"].shift(-VERBAL_SHIFT)-df["start"])).dropna()
         if len(rate_interpolated) > 0:
             try: 
@@ -108,16 +110,12 @@ def process_targets(files, syntax):
         else:
             fit = [0,0]
 
-        # pause rate trend calculation
-        pause_rate = len(pauses)/duration
-        pause_rate_interpolated = ((PAUSE_SHIFT+1)/(diffs["end"].shift(-PAUSE_SHIFT)-diffs["start"])).dropna()
-        if len(pause_rate_interpolated) > 0:
-            try: 
-                pause_fit = np.polyfit(x=range(len(pause_rate_interpolated)), y=pause_rate_interpolated, deg=1)
-            except:
-                pause_fit = [0,0]
-        else:
-            pause_fit = [0,0]
+        # pause rate calculation -- Beltrami 2014
+        # also called "voice to silence ratio"
+        try:
+            pause_rate = total_words/len(pauses)
+        except ZeroDivisionError:
+            pause_rate = total_words
 
         # decode the syntax output
         with open(s, 'rb') as df:
@@ -125,6 +123,7 @@ def process_targets(files, syntax):
 
         # flatten output
         syntax_parsed_flattened = np.array(sum(syntax_parsed, []))
+        s,x = syntax_parsed_flattened.shape
 
         # create metadata column
         data = pd.Series({
@@ -132,17 +131,14 @@ def process_targets(files, syntax):
             "mean_pause": mean_pause,
             "pause_std": pause_std,
             "total_words": total_words,
-            "duration": duration,
             "verbal_rate": verbal_rate,
             "verbal_rate_trend": fit[0],
             "verbal_rate_interpolated": rate_interpolated,
-            "pause_rate": pause_rate,
-            "pause_rate_trend": pause_fit[0],
-            "pause_rate_interpolated": pause_rate_interpolated,
+            "phonation_time": phonation_time,
             "silence_duration": silence_duration,
-            "speech_duration": speech_duration,
-            "voice_silence_ratio": voice_silence_ratio,
-            "syntax": syntax_parsed_flattened
+            "speech_duration": duration,
+            "voice_silence_ratio": pause_rate,
+            "syntax": syntax_parsed_flattened.reshape(s*x)
         })
 
         # append data
@@ -178,7 +174,7 @@ max_utterance_length = data["syntax"].apply(lambda x : len(x)).max()
 # utility to pad sequence
 def pad_seq(x):
     # create the pad arr
-    pad_arr = np.array([[0,0,0] for _ in range(max_utterance_length-len(x))])
+    pad_arr = np.array([-1 for _ in range(max_utterance_length-len(x))])
     # if we need to pad, pad
     if (max_utterance_length-len(x)) > 0:
         res = np.concatenate((x, pad_arr))
@@ -258,9 +254,6 @@ WANG = ["silence_duration", "speech_duration", "voice_silence_ratio", "verbal_ra
 wang_results_ad, wang_results_control = describe_variables(data, WANG)
 wang_stat_results = analyze_variables(data, WANG)
 
-wang_results_ad
-wang_results_control
-
 # analyze pause results
 PAUSE = ["max_pause", "mean_pause", "pause_std", "verbal_rate"] 
 pause_results_ad, pause_results_control = describe_variables(data, PAUSE)
@@ -297,34 +290,30 @@ out_concat = pd.concat([out_data, out_test])
 
 # create 3d syntax input array, which we will flatten
 in_data_syntax = np.array(in_data["syntax_padded"].to_list())
-samples, x, y = in_data_syntax.shape
-in_data_syntax = in_data_syntax.reshape(samples, x*y)
-
 in_test_syntax = np.array(in_test["syntax_padded"].to_list())
-samples, x, y = in_test_syntax.shape
-in_test_syntax = in_test_syntax.reshape(samples, x*y)
-
-# random classifier test
-clsf = SVC()
-clsf = clsf.fit(in_data_syntax, out_data)
-clsf.score(in_test_syntax, out_test)
 
 # random forest
 clsf = RandomForestClassifier()
 clsf = clsf.fit(in_data_syntax, out_data)
 clsf.score(in_test_syntax, out_test)
 
-test_tree = clsf.estimators_[0]
-plot_tree(test_tree)
+# decision tree
+clsf = DecisionTreeClassifier()
+clsf = clsf.fit(in_data_syntax, out_data)
+clsf.score(in_test_syntax, out_test)
+
+plot_tree(clsf)
 plt.show()
 
-out_test[out_test==1]
-
+# random classifier test
+clsf = SVC(kernel='poly')
+clsf = clsf.fit(in_data_syntax, out_data)
+clsf.score(in_test_syntax, out_test)
 
 # KNN
-clsf = KNeighborsClassifier(5)
-clsf = clsf.fit(in_data[["verbal_rate", "silence_duration"]], out_data)
-clsf.score(in_test[["verbal_rate", "silence_duration"]], out_test)
+clsf = KNeighborsClassifier(2)
+clsf = clsf.fit(in_data_syntax, out_data)
+clsf.score(in_test_syntax, out_test)
 
 
 # plot
@@ -336,16 +325,16 @@ plt.show()
 #### PCA ####
 
 # collect pca data
-norm_data = data.drop(columns=["verbal_rate_interpolated", "pause_rate_interpolated"])
-norm_data.iloc(axis=1)[:-1] = norm_data.iloc(axis=1)[:-1].apply(lambda x:(x-x.mean())/x.std(), axis=0)
+# norm_data = data.drop(columns=["verbal_rate_interpolated", "pause_rate_interpolated"])
+# norm_data.iloc(axis=1)[:-1] = norm_data.iloc(axis=1)[:-1].apply(lambda x:(x-x.mean())/x.std(), axis=0)
 
 # run PCA
 pca = PCA(n_components=2)
-in_pca = pca.fit(norm_data)
-data_pca = pca.transform(norm_data)
+in_pca = pca.fit_transform(in_data_syntax)
+# data_pca = pca.transform(norm_data)
 
 # plot PCA
-pca_plot = sns.scatterplot(x=data_pca[:,0], y=data_pca[:,1], hue=out_concat, style=in_concat.split)
+pca_plot = sns.scatterplot(x=in_pca[:,0], y=in_pca[:,1], hue=out_data)
 pca_plot.set(xlabel="PCA1", ylabel="PCA2")
 plt.show()
 
