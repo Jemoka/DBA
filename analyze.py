@@ -314,6 +314,12 @@ clsf = RandomForestClassifier()
 clsf = clsf.fit(in_data_syntax, out_data)
 clsf.score(in_test_syntax, out_test)
 
+test_tree = clsf.estimators_[0]
+plot_tree(test_tree)
+plt.show()
+
+out_test[out_test==1]
+
 
 # KNN
 clsf = KNeighborsClassifier(5)
