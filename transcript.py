@@ -25,10 +25,10 @@ CLAN_PATH=""
 
 # file to check
 DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/dementia"
 
 DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-12/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/control"
 
 # tier to read
 READ="*PAR"

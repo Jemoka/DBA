@@ -120,12 +120,10 @@ def process_targets(files, meta):
         # decode the meta output
         with open(s, 'rb') as df:
             meta_parsed = pickle.load(df)
-            syntax_parsed = meta_parsed["tokens"]
+            syntax_parsed = meta_parsed["syntax"]
+            structure_parsed = meta_parsed["relational"]
+            pos_parsed = meta_parsed["pos"]
             mmse = meta_parsed["mmse"]
-
-        # flatten output
-        syntax_parsed_flattened = np.array(sum(syntax_parsed, []))
-        s,x = syntax_parsed_flattened.shape
 
         # create metadata column
         data = pd.Series({
@@ -140,7 +138,9 @@ def process_targets(files, meta):
             "silence_duration": silence_duration,
             "speech_duration": duration,
             "voice_silence_ratio": pause_rate,
-            "syntax": syntax_parsed_flattened.reshape(s*x),
+            "syntax": syntax_parsed,
+            "structure": structure_parsed,
+            "pos": pos_parsed,
             "mmse": mmse
         })
 
@@ -171,11 +171,12 @@ dementia = dementia[:min(len(control), len(dementia))]
 # concat
 data = pd.concat([dementia, control])
 data.reset_index(drop=True, inplace=True)
-# pad the syntax to max utterance length
-max_utterance_length = data["syntax"].apply(lambda x : len(x)).max()
+
 
 # utility to pad sequence
-def pad_seq(x):
+def pad_seq(x, to):
+    # flatten x
+    x = sum(x, [])
     # create the pad arr
     pad_arr = np.array([-1 for _ in range(max_utterance_length-len(x))])
     # if we need to pad, pad
@@ -187,7 +188,14 @@ def pad_seq(x):
     return res
 
 # set the padded result back
-data["syntax_padded"] = data["syntax"].apply(pad_seq)
+syntax_length = data["syntax"].apply(lambda x : len(sum(x, []))).max()
+data["syntax_padded"] = data["syntax"].apply(lambda x: pad_seq(x, syntax_length)).to_numpy()
+
+structure_length = data["structure"].apply(lambda x : len(sum(x, []))).max()
+data["structure_padded"] = data["structure"].apply(lambda x: pad_seq(x, structure_length)).to_numpy()
+
+pos_length = data["pos"].apply(lambda x : len(sum(x, []))).max()
+data["pos_padded"] = data["pos"].apply(lambda x: pad_seq(x, pos_length)).to_numpy()
 
 # shuffle again
 data = data.sample(frac=1)
@@ -291,15 +299,28 @@ in_concat = pd.concat([in_copy, test_in_copy])
 # out data
 out_concat = pd.concat([out_data, out_test])
 
-# create 3d syntax input array, which we will flatten
+# create 3d syntax, structure, and pos arrays
 in_data_syntax = np.array(in_data["syntax_padded"].to_list())
 in_test_syntax = np.array(in_test["syntax_padded"].to_list())
 
+in_data_structure = np.array(in_data["structure_padded"].to_list())
+in_test_structure = np.array(in_test["structure_padded"].to_list())
+
+in_data_pos = np.array(in_data["pos_padded"].to_list())
+in_test_pos = np.array(in_test["pos_padded"].to_list())
+
+# define columns to droup
+non_scalar_features = ["verbal_rate_interpolated",
+                       "syntax", "syntax_padded", 
+                       "structure", "structure_padded", 
+                       "pos", "pos_padded", 
+                       "mmse"] # this is the output
+
 # and then, append the rest of the integer feature data
-in_features = in_data.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded", "mmse"])
+in_features = in_data.drop(columns=non_scalar_features)
 in_features = np.concatenate((in_features, in_data_syntax), axis=1)
 
-test_features = in_test.drop(columns=["verbal_rate_interpolated", "syntax", "syntax_padded", "mmse"])
+test_features = in_test.drop(columns=non_scalar_features)
 test_features = np.concatenate((test_features, in_test_syntax), axis=1)
 
 # Task test 1: use syntax to regress for MMSE
@@ -308,7 +329,7 @@ reg = reg.fit(in_data_syntax, in_data.mmse)
 reg.score(in_test_syntax, in_test.mmse)
 
 reg = SVR(kernel="poly")
-reg = reg.fit(in_data_syntax, in_data.mmse)
+reg = reg.fit(in_data_structure, in_data.mmse)
 reg.score(in_test_syntax, in_test.mmse)
 
 # random forest
