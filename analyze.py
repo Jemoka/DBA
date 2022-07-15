@@ -37,7 +37,9 @@ import matplotlib.pyplot as plt
 CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/control/"
 DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/dementia/"
 # OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.csv"
+# LING_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.bin"
 OUT_DIR = None
+LING_DIR = None
 
 # get val test split
 TEST_SPLIT = 0.1
@@ -197,14 +199,31 @@ data["structure_padded"] = data["structure"].apply(lambda x: pad_seq(x, structur
 pos_length = data["pos"].apply(lambda x : len(sum(x, []))).max()
 data["pos_padded"] = data["pos"].apply(lambda x: pad_seq(x, pos_length)).to_numpy()
 
+data["syntax"].apply(lambda x : len(sum(x, []))).min()
+
 # shuffle again
 data = data.sample(frac=1)
+
+# create 3d syntax, structure, and pos arrays
+# explode mmse
+mmse_exploded = sum(data.apply(lambda x: [x.mmse for _ in range(len(x.syntax))], axis=1),[])
+
+# extract final linguistic features
+syntax = sum(data["syntax"].to_list(), [])
+structural = sum(data["structure"].to_list(), [])
+pos = sum(data["pos"].to_list(), [])
+
+# save
+linguistic_features = list(zip(syntax, structural, pos, mmse_exploded))
 
 #### Statisics and Simple Analysis ####
 
 # data
 if OUT_DIR:
     data.to_csv(OUT_DIR, index=False)
+if LING_DIR:
+    with open(LING_DIR, "wb") as df:
+        pickle.dump(linguistic_features, df)
 
 # analyzer tools
 # mean and std
@@ -276,6 +295,9 @@ pause_stat_results = analyze_variables(data, PAUSE)
 train_data = data.iloc[:-int(TEST_SPLIT*len(data))]
 test_data = data.iloc[-int(TEST_SPLIT*len(data)):]
 
+train_ling = linguistic_features[:-int(TEST_SPLIT*len(linguistic_features))]
+test_ling = linguistic_features[-int(TEST_SPLIT*len(linguistic_features)):]
+
 # in and out data
 in_data = train_data.drop(columns=["target"])
 out_data = train_data["target"]
@@ -299,15 +321,11 @@ in_concat = pd.concat([in_copy, test_in_copy])
 # out data
 out_concat = pd.concat([out_data, out_test])
 
-# create 3d syntax, structure, and pos arrays
-in_data_syntax = np.array(in_data["syntax_padded"].to_list())
-in_test_syntax = np.array(in_test["syntax_padded"].to_list())
+# flatten 
+linguistic_features
 
-in_data_structure = np.array(in_data["structure_padded"].to_list())
-in_test_structure = np.array(in_test["structure_padded"].to_list())
-
-in_data_pos = np.array(in_data["pos_padded"].to_list())
-in_test_pos = np.array(in_test["pos_padded"].to_list())
+# count the 
+utterance_count = in_data["syntax"].apply(len)
 
 # define columns to droup
 non_scalar_features = ["verbal_rate_interpolated",
@@ -329,8 +347,8 @@ reg = reg.fit(in_data_syntax, in_data.mmse)
 reg.score(in_test_syntax, in_test.mmse)
 
 reg = SVR(kernel="poly")
-reg = reg.fit(in_data_structure, in_data.mmse)
-reg.score(in_test_syntax, in_test.mmse)
+reg = reg.fit(in_data_pos, in_data.mmse)
+reg.score(in_test_pos, in_test.mmse)
 
 # random forest
 clsf = RandomForestClassifier()
