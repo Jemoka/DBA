@@ -23,11 +23,11 @@ repath_file = lambda file_path, new_dir: os.path.join(new_dir, pathlib.Path(file
 CLAN_PATH=""
 
 # file to check
-DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/ADReSS2020-07-15/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/ADReSS2020-07-15/dementia"
+DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/dementia"
 
-DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/ADReSS2020-07-15/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/ADReSS2020-07-15/control"
+DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/control"
 
 # tier to read
 READ="*PAR"
@@ -44,7 +44,7 @@ def do(DATADIR, OUTDIR):
     for checkfile in files:
 
         # run flo on the file
-        CMD = f"{os.path.join(CLAN_PATH, 'flo +t%xwor +t%mor +t%gra')} {checkfile} >/dev/null 2>&1"
+        CMD = f"{os.path.join(CLAN_PATH, 'flo +t%wor +t%xwor +t%mor +t%gra +t@ID')} {checkfile} >/dev/null 2>&1"
         # run!
         os.system(CMD)
 
@@ -58,6 +58,23 @@ def do(DATADIR, OUTDIR):
 
         # delete result file
         os.remove(result_path)
+
+        # seperate metadata and data
+        meta, data = data[:2], data[2:]
+
+        # parse and format all metadata lines
+        res = [[j for j in re.sub(".*\t", "", str(i).strip()).split("|") if j != ''] for i in meta]
+        res_dict = {}
+        try:
+            # for each entry, append tier metadata
+            for r in res:
+                res_dict[r[2]] = r[4:]
+            # and finally, log mmse
+                MMSE = int(res_dict[READ[1:]][-1])
+        except (ValueError, IndexError):
+            print(checkfile)
+            continue
+
 
         # conform result with tab-seperated beginnings
         result = []
@@ -236,17 +253,18 @@ def do(DATADIR, OUTDIR):
         encoded_syntax_features = [[[syntax_tokens[k] for k in j] for j in i] for i in extracted_syntactic_features]
 
         # save the syntax features
-        with open(repath_file(checkfile, OUTDIR).replace(".cha", "-syntax.bin"), "wb") as df:
+        with open(repath_file(checkfile, OUTDIR).replace(".cha", "-meta.bin"), "wb") as df:
                         # dump the syntax features
-            pickle.dump(encoded_syntax_features, df)
+            pickle.dump({"tokens": encoded_syntax_features,
+                        "mmse": MMSE}, df)
 
         # write the final output file
         wordframe.to_csv(repath_file(checkfile, OUTDIR).replace(".cha", "-wordframe.csv"))
 
-    # dump the syntax token lookup table
-    with open(os.path.join(OUTDIR, "tokens.bin"), "wb") as df:
-                        # dump the frozen syntax features
-        pickle.dump(dict(syntax_tokens), df)
+        # dump the syntax token lookup table
+        with open(os.path.join(OUTDIR, "tokens.bin"), "wb") as df:
+            # dump the frozen syntax features
+            pickle.dump(dict(syntax_tokens), df)
 
 do(DATADIR_AD, OUTDIR_AD)
 do(DATADIR_C, OUTDIR_C)
