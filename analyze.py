@@ -24,14 +24,17 @@ from sklearn.neighbors import KNeighborsClassifier
 # stats
 from scipy.stats import kstest, pearsonr
 
+# import unpickling
+import pickle
+
 # plotting
 import seaborn as sns
 sns.set_theme()
 import matplotlib.pyplot as plt
 
 # get all dirs
-CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13/control/"
-DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13/dementia/"
+CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/control/"
+DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/dementia/"
 # OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.csv"
 OUT_DIR = None
 
@@ -40,11 +43,16 @@ TEST_SPLIT = 0.1
 
 # get all files
 control_files = glob.glob(os.path.join(CONTROL_DIR, "*.csv"))
+control_syntax = glob.glob(os.path.join(CONTROL_DIR, "*.bin"))
+control_lookup = os.path.join(CONTROL_DIR, "tokens.bin")
+
 dementia_files = glob.glob(os.path.join(DEMENTIA_DIR, "*.csv"))
+dementia_syntax = glob.glob(os.path.join(DEMENTIA_DIR, "*.bin"))
+dementia_lookup = os.path.join(DEMENTIA_DIR, "tokens.bin")
 
 # collect targets
 # for each file
-def process_targets(files):
+def process_targets(files, syntax):
     # verbal rate interpolation rate for trend
     VERBAL_SHIFT = 50
     PAUSE_SHIFT = 1
@@ -52,7 +60,7 @@ def process_targets(files):
     result = []
 
     # for each file
-    for f in files:
+    for f,s in zip(sorted(files), sorted(syntax)):
         # read the csv
         df = pd.read_csv(f, index_col=0)
         # name columns
@@ -89,12 +97,6 @@ def process_targets(files):
         else:
             voice_silence_ratio = 0 # this is almost max
 
-        # # pause metadata (not mentinoed)
-        # inter_pause_distance = df.diff().iloc[1:]["start"]
-        # mean_inter_pause_distance = inter_pause_distance.mean()
-        # max_inter_pause_distance = inter_pause_distance.max()
-        # inter_pause_distance_std = inter_pause_distance.std()
-
         # verbal rate trend calculation
         rate_interpolated = ((VERBAL_SHIFT+1)/(df["end"].shift(-VERBAL_SHIFT)-df["start"])).dropna()
         if len(rate_interpolated) > 0:
@@ -116,6 +118,13 @@ def process_targets(files):
         else:
             pause_fit = [0,0]
 
+        # decode the syntax output
+        with open(s, 'rb') as df:
+            syntax_parsed = pickle.load(df)
+
+        # flatten output
+        syntax_parsed_flattened = np.array(sum(syntax_parsed, []))
+
         # create metadata column
         data = pd.Series({
             "max_pause": max_pause,
@@ -132,6 +141,7 @@ def process_targets(files):
             "silence_duration": silence_duration,
             "speech_duration": speech_duration,
             "voice_silence_ratio": voice_silence_ratio,
+            "syntax": syntax_parsed_flattened
         })
 
         # append data
@@ -141,13 +151,13 @@ def process_targets(files):
     return result
 
 # process control
-control = process_targets(control_files)
+control = process_targets(control_files, control_syntax)
 control = pd.DataFrame(control)
 control = control.dropna()
 control["target"] = 0
 
 # process dementia
-dementia = process_targets(dementia_files)
+dementia = process_targets(dementia_files, dementia_syntax)
 dementia = pd.DataFrame(dementia)
 dementia = dementia.dropna()
 dementia["target"] = 1
@@ -161,6 +171,24 @@ dementia = dementia[:min(len(control), len(dementia))]
 # concat
 data = pd.concat([dementia, control])
 data.reset_index(drop=True, inplace=True)
+# pad the syntax to max utterance length
+max_utterance_length = data["syntax"].apply(lambda x : len(x)).max()
+
+# utility to pad sequence
+def pad_seq(x):
+    # create the pad arr
+    pad_arr = np.array([[0,0,0] for _ in range(max_utterance_length-len(x))])
+    # if we need to pad, pad
+    if (max_utterance_length-len(x)) > 0:
+        res = np.concatenate((x, pad_arr))
+    # else, do nothing
+    else:
+        res = x
+    return res
+
+# set the padded result back
+data["syntax_padded"] = data["syntax"].apply(pad_seq)
+
 # shuffle again
 data = data.sample(frac=1)
 
@@ -265,6 +293,7 @@ in_concat = pd.concat([in_copy, test_in_copy])
 
 # out data
 out_concat = pd.concat([out_data, out_test])
+
 
 # random classifier test
 clsf = SVC()
