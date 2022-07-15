@@ -19,6 +19,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.neighbors import KNeighborsClassifier
 
 # stats
@@ -39,7 +40,7 @@ DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-14/de
 OUT_DIR = None
 
 # get val test split
-TEST_SPLIT = 0.1
+TEST_SPLIT = 0.3
 
 # get all files
 control_files = glob.glob(os.path.join(CONTROL_DIR, "*.csv"))
@@ -272,11 +273,11 @@ train_data = data.iloc[:-int(TEST_SPLIT*len(data))]
 test_data = data.iloc[-int(TEST_SPLIT*len(data)):]
 
 # in and out data
-in_data = train_data.iloc(axis=1)[:-1]
-out_data = train_data.iloc(axis=1)[-1]
+in_data = train_data.drop(columns=["target"])
+out_data = train_data["target"]
 
-in_test = test_data.iloc(axis=1)[:-1]
-out_test = test_data.iloc(axis=1)[-1]
+in_test = test_data.drop(columns=["target"])
+out_test = test_data["target"]
 
 # concatenate data
 # in data
@@ -294,16 +295,25 @@ in_concat = pd.concat([in_copy, test_in_copy])
 # out data
 out_concat = pd.concat([out_data, out_test])
 
+# create 3d syntax input array, which we will flatten
+in_data_syntax = np.array(in_data["syntax_padded"].to_list())
+samples, x, y = in_data_syntax.shape
+in_data_syntax = in_data_syntax.reshape(samples, x*y)
+
+in_test_syntax = np.array(in_test["syntax_padded"].to_list())
+samples, x, y = in_test_syntax.shape
+in_test_syntax = in_test_syntax.reshape(samples, x*y)
 
 # random classifier test
 clsf = SVC()
-clsf = clsf.fit(in_data[["verbal_rate", "silence_duration"]], out_data)
-clsf.score(in_test[["verbal_rate", "silence_duration"]], out_test)
+clsf = clsf.fit(in_data_syntax, out_data)
+clsf.score(in_test_syntax, out_test)
 
 # random forest
 clsf = RandomForestClassifier()
-clsf = clsf.fit(in_data[["verbal_rate", "silence_duration"]], out_data)
-clsf.score(in_test[["verbal_rate", "silence_duration"]], out_test)
+clsf = clsf.fit(in_data_syntax, out_data)
+clsf.score(in_test_syntax, out_test)
+
 
 # KNN
 clsf = KNeighborsClassifier(5)
