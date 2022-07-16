@@ -174,47 +174,41 @@ dementia = dementia[:min(len(control), len(dementia))]
 data = pd.concat([dementia, control])
 data.reset_index(drop=True, inplace=True)
 
-
 # utility to pad sequence
 def pad_seq(x, to):
-    # flatten x
-    x = sum(x, [])
     # create the pad arr
-    pad_arr = np.array([-1 for _ in range(max_utterance_length-len(x))])
-    # if we need to pad, pad
-    if (max_utterance_length-len(x)) > 0:
-        res = np.concatenate((x, pad_arr))
-    # else, do nothing
-    else:
-        res = x
-    return res
-
-# set the padded result back
-syntax_length = data["syntax"].apply(lambda x : len(sum(x, []))).max()
-data["syntax_padded"] = data["syntax"].apply(lambda x: pad_seq(x, syntax_length)).to_numpy()
-
-structure_length = data["structure"].apply(lambda x : len(sum(x, []))).max()
-data["structure_padded"] = data["structure"].apply(lambda x: pad_seq(x, structure_length)).to_numpy()
-
-pos_length = data["pos"].apply(lambda x : len(sum(x, []))).max()
-data["pos_padded"] = data["pos"].apply(lambda x: pad_seq(x, pos_length)).to_numpy()
-
-data["syntax"].apply(lambda x : len(sum(x, []))).min()
+    pad_arr = [[0 for _ in range(to-len(i))] for i in x]
+    # create final array
+    final_arr = []
+    for i,j in zip(x, pad_arr):
+        final_arr.append(i+j)
+    # return
+    return final_arr
 
 # shuffle again
 data = data.sample(frac=1)
+
+# set the padded result back
+syntax_length = data["syntax"].apply(lambda x : max([len(i) for i in x])).max()
+data["syntax_padded"] = data["syntax"].apply(lambda x: pad_seq(x, syntax_length)).to_numpy()
+
+structure_length = data["structure"].apply(lambda x : max([len(i) for i in x])).max()
+data["structure_padded"] = data["structure"].apply(lambda x: pad_seq(x, structure_length)).to_numpy()
+
+pos_length = data["pos"].apply(lambda x : max([len(i) for i in x])).max()
+data["pos_padded"] = data["pos"].apply(lambda x: pad_seq(x, pos_length)).to_numpy()
 
 # create 3d syntax, structure, and pos arrays
 # explode mmse
 mmse_exploded = sum(data.apply(lambda x: [x.mmse for _ in range(len(x.syntax))], axis=1),[])
 
 # extract final linguistic features
-syntax = sum(data["syntax"].to_list(), [])
-structural = sum(data["structure"].to_list(), [])
-pos = sum(data["pos"].to_list(), [])
+syntax_exploded = np.array(sum(data["syntax_padded"].to_list(), []))
+structural_exploded = np.array(sum(data["structure_padded"].to_list(), []))
+pos_exploded = np.array(sum(data["pos_padded"].to_list(), []))
 
 # save
-linguistic_features = list(zip(syntax, structural, pos, mmse_exploded))
+linguistic_features = list(zip(syntax_exploded, structural_exploded, pos_exploded, mmse_exploded))
 
 #### Statisics and Simple Analysis ####
 
@@ -305,6 +299,12 @@ out_data = train_data["target"]
 in_test = test_data.drop(columns=["target"])
 out_test = test_data["target"]
 
+in_ling = np.array([np.concatenate(np.stack(i[:-1], axis=0)) for i in train_ling])
+mmse_ling = np.array([i[-1] for i in train_ling])
+
+in_test_ling = np.array([np.concatenate(np.stack(i[:-1], axis=0)) for i in test_ling])
+mmse_test_ling = np.array([i[-1] for i in test_ling])
+
 # concatenate data
 # in data
 # copy frames
@@ -335,20 +335,20 @@ non_scalar_features = ["verbal_rate_interpolated",
                        "mmse"] # this is the output
 
 # and then, append the rest of the integer feature data
-in_features = in_data.drop(columns=non_scalar_features)
-in_features = np.concatenate((in_features, in_data_syntax), axis=1)
+# in_features = in_data.drop(columns=non_scalar_features)
+# in_features = np.concatenate((in_features, in_data_syntax), axis=1)
 
-test_features = in_test.drop(columns=non_scalar_features)
-test_features = np.concatenate((test_features, in_test_syntax), axis=1)
+# test_features = in_test.drop(columns=non_scalar_features)
+# test_features = np.concatenate((test_features, in_test_syntax), axis=1)
 
 # Task test 1: use syntax to regress for MMSE
 reg = DecisionTreeRegressor()
-reg = reg.fit(in_data_syntax, in_data.mmse)
-reg.score(in_test_syntax, in_test.mmse)
+reg = reg.fit(in_ling, mmse_ling)
+reg.score(in_test_ling, mmse_test_ling)
 
 reg = SVR(kernel="poly")
-reg = reg.fit(in_data_pos, in_data.mmse)
-reg.score(in_test_pos, in_test.mmse)
+reg = reg.fit(in_ling, mmse_ling)
+reg.score(in_test_ling, mmse_test_ling)
 
 # random forest
 clsf = RandomForestClassifier()
