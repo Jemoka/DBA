@@ -341,6 +341,13 @@ non_scalar_features = ["verbal_rate_interpolated",
 # test_features = in_test.drop(columns=non_scalar_features)
 # test_features = np.concatenate((test_features, in_test_syntax), axis=1)
 
+in_ling
+mmse_ling.mean()
+mmse_ling.std()
+
+mmse_plot = sns.histplot(x=mmse_ling)
+plt.show()
+
 # Task test 1: use syntax to regress for MMSE
 reg = DecisionTreeRegressor()
 reg = reg.fit(in_ling, mmse_ling)
