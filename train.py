@@ -107,7 +107,7 @@ run.watch(model)
 for e in range(config.epochs):
     print(f"Training epoch {e}...")
 
-    for indx, batch_id in tqdm(enumerate(range(0, len(train_data)-config.batch_size, config.batch_size)), total=((len(train_data)-config.batch_size)//config.batch_size)):
+    for indx, batch_id in tqdm(enumerate(range(0, len(train_data)-config.batch_size, config.batch_size)), total=((len(train_data)-config.batch_size)//config.batch_size)+1):
         # get in and out batches
         batch_in = train_data_in[batch_id:batch_id+config.batch_size].to(DEVICE).float()
         batch_out = train_data_out[batch_id:batch_id+config.batch_size].to(DEVICE).float()
