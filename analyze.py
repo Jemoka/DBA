@@ -210,12 +210,15 @@ data["syntactical_features"] = data.apply(lambda x : encode_seq(x, LENGTH), axis
 # create 3d syntax, structure, and pos arrays
 # explode mmse
 mmse_exploded = sum(data.apply(lambda x: [x.mmse for _ in range(len(x.syntax))], axis=1),[])
+mmse_array = np.array(mmse_exploded)
+mmse_normed = (mmse_array-mmse_array.mean())/mmse_array.std()
 target_exploded = sum(data.apply(lambda x: [x.target for _ in range(len(x.syntax))], axis=1),[])
 
 # extract final linguistic features
 syntactical_features = list(zip(np.array(sum(data["syntactical_features"].to_list(), [])),
                                 mmse_exploded,
-                                target_exploded))
+                                target_exploded,
+                                mmse_normed))
 
 #### Statisics and Simple Analysis ####
 
