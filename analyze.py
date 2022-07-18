@@ -24,6 +24,7 @@ from sklearn.neighbors import KNeighborsClassifier
 
 # stats
 from scipy.stats import kstest, pearsonr
+from scipy import sparse
 
 # import unpickling
 import pickle
@@ -34,12 +35,12 @@ sns.set_theme()
 import matplotlib.pyplot as plt
 
 # get all dirs
-CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/control/"
-DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/dementia/"
+CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/control/"
+DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/dementia/"
 # OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.csv"
-# LING_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.bin"
+LING_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-syntax.bin"
 OUT_DIR = None
-LING_DIR = None
+# LING_DIR = None
 
 # get val test split
 TEST_SPLIT = 0.1
@@ -47,11 +48,19 @@ TEST_SPLIT = 0.1
 # get all files
 control_files = glob.glob(os.path.join(CONTROL_DIR, "*.csv"))
 control_syntax = glob.glob(os.path.join(CONTROL_DIR, "*.bin"))
-control_lookup = os.path.join(CONTROL_DIR, "tokens.bin")
 
 dementia_files = glob.glob(os.path.join(DEMENTIA_DIR, "*.csv"))
 dementia_syntax = glob.glob(os.path.join(DEMENTIA_DIR, "*.bin"))
-dementia_lookup = os.path.join(DEMENTIA_DIR, "tokens.bin")
+
+lookup = os.path.join(CONTROL_DIR, "tokens.bin")
+
+# open and parse lookup dictionary
+with open(lookup, 'rb') as df:
+    # read the content
+    LOOKUP = pickle.load(df)["tokens"]
+
+# get the length
+LENGTH = len(LOOKUP.keys())
 
 # collect targets
 # for each file
@@ -174,41 +183,39 @@ dementia = dementia[:min(len(control), len(dementia))]
 data = pd.concat([dementia, control])
 data.reset_index(drop=True, inplace=True)
 
-# utility to pad sequence
-def pad_seq(x, to):
-    # create the pad arr
-    pad_arr = [[0 for _ in range(to-len(i))] for i in x]
-    # create final array
-    final_arr = []
-    for i,j in zip(x, pad_arr):
-        final_arr.append(i+j)
-    # return
-    return final_arr
-
 # shuffle again
 data = data.sample(frac=1)
 
+# utility to pad sequence
+def encode_seq(x, to):
+    # create empty array
+    res = []
+
+    # for each of the utterances
+    for s,t,p in zip(*x[["syntax","structure","pos"]]):
+        # create a zero array
+        template = np.zeros(to)
+        # activate the syntax, structure, and position
+        template[s] = 1
+        template[t] = 1
+        template[p] = 1
+        # append to res
+        res.append(sparse.csr_array(template))
+
+    return res
+
 # set the padded result back
-syntax_length = data["syntax"].apply(lambda x : max([len(i) for i in x])).max()
-data["syntax_padded"] = data["syntax"].apply(lambda x: pad_seq(x, syntax_length)).to_numpy()
-
-structure_length = data["structure"].apply(lambda x : max([len(i) for i in x])).max()
-data["structure_padded"] = data["structure"].apply(lambda x: pad_seq(x, structure_length)).to_numpy()
-
-pos_length = data["pos"].apply(lambda x : max([len(i) for i in x])).max()
-data["pos_padded"] = data["pos"].apply(lambda x: pad_seq(x, pos_length)).to_numpy()
+data["syntactical_features"] = data.apply(lambda x : encode_seq(x, LENGTH), axis=1)
 
 # create 3d syntax, structure, and pos arrays
 # explode mmse
 mmse_exploded = sum(data.apply(lambda x: [x.mmse for _ in range(len(x.syntax))], axis=1),[])
+target_exploded = sum(data.apply(lambda x: [x.target for _ in range(len(x.syntax))], axis=1),[])
 
 # extract final linguistic features
-syntax_exploded = np.array(sum(data["syntax_padded"].to_list(), []))
-structural_exploded = np.array(sum(data["structure_padded"].to_list(), []))
-pos_exploded = np.array(sum(data["pos_padded"].to_list(), []))
-
-# save
-linguistic_features = list(zip(syntax_exploded, structural_exploded, pos_exploded, mmse_exploded))
+syntactical_features = list(zip(np.array(sum(data["syntactical_features"].to_list(), [])),
+                                mmse_exploded,
+                                target_exploded))
 
 #### Statisics and Simple Analysis ####
 
@@ -217,7 +224,7 @@ if OUT_DIR:
     data.to_csv(OUT_DIR, index=False)
 if LING_DIR:
     with open(LING_DIR, "wb") as df:
-        pickle.dump(linguistic_features, df)
+        pickle.dump(syntactical_features, df)
 
 # analyzer tools
 # mean and std
@@ -289,8 +296,8 @@ pause_stat_results = analyze_variables(data, PAUSE)
 train_data = data.iloc[:-int(TEST_SPLIT*len(data))]
 test_data = data.iloc[-int(TEST_SPLIT*len(data)):]
 
-train_ling = linguistic_features[:-int(TEST_SPLIT*len(linguistic_features))]
-test_ling = linguistic_features[-int(TEST_SPLIT*len(linguistic_features)):]
+train_ling = syntactical_features[:-int(TEST_SPLIT*len(linguistic_features))]
+test_ling = syntactical_features[-int(TEST_SPLIT*len(linguistic_features)):]
 
 # in and out data
 in_data = train_data.drop(columns=["target"])
@@ -299,11 +306,17 @@ out_data = train_data["target"]
 in_test = test_data.drop(columns=["target"])
 out_test = test_data["target"]
 
-in_ling = np.array([np.concatenate(np.stack(i[:-1], axis=0)) for i in train_ling])
-mmse_ling = np.array([i[-1] for i in train_ling])
+in_ling = sparse.vstack([i[0] for i in train_ling])
+mmse_ling = np.array([i[1] for i in train_ling])
+target_ling = np.array([i[2] for i in train_ling])
 
-in_test_ling = np.array([np.concatenate(np.stack(i[:-1], axis=0)) for i in test_ling])
-mmse_test_ling = np.array([i[-1] for i in test_ling])
+in_test_ling = sparse.vstack([i[0] for i in test_ling])
+mmse_test_ling = np.array([i[1] for i in test_ling])
+target_test_ling = np.array([i[2] for i in test_ling])
+
+# normalize mmse
+mmse_ling_norm =  (mmse_ling-mmse_ling.mean())/mmse_ling.std()
+mmse_test_ling_norm =  (mmse_test_ling-mmse_test_ling.mean())/mmse_test_ling.std()
 
 # concatenate data
 # in data
@@ -320,9 +333,6 @@ in_concat = pd.concat([in_copy, test_in_copy])
 
 # out data
 out_concat = pd.concat([out_data, out_test])
-
-# flatten 
-linguistic_features
 
 # count the 
 utterance_count = in_data["syntax"].apply(len)
@@ -341,21 +351,19 @@ non_scalar_features = ["verbal_rate_interpolated",
 # test_features = in_test.drop(columns=non_scalar_features)
 # test_features = np.concatenate((test_features, in_test_syntax), axis=1)
 
-in_ling
-mmse_ling.mean()
-mmse_ling.std()
-
-mmse_plot = sns.histplot(x=mmse_ling)
-plt.show()
-
-# Task test 1: use syntax to regress for MMSE
-reg = DecisionTreeRegressor()
-reg = reg.fit(in_ling, mmse_ling)
-reg.score(in_test_ling, mmse_test_ling)
-
+# MMSE regression
 reg = SVR(kernel="poly")
-reg = reg.fit(in_ling, mmse_ling)
-reg.score(in_test_ling, mmse_test_ling)
+reg = reg.fit(in_ling, mmse_ling_norm)
+reg.score(in_test_ling, mmse_test_ling_norm)
+
+reg.predict(in_test_ling)
+# output_test
+
+
+# SVC classification
+clsf = SVC(kernel="poly")
+clsf = clsf.fit(in_ling, target_ling)
+clsf.score(in_test_ling, target_test_ling)
 
 # random forest
 clsf = RandomForestClassifier()
@@ -395,7 +403,7 @@ plt.show()
 
 # run PCA
 pca = PCA(n_components=1)
-in_pca = pca.fit_transform(in_data_syntax)
+in_pca = pca.fit_transform(in_ling.toarray())
 # data_pca = pca.transform(norm_data)
 
 # plot PCA

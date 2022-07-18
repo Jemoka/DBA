@@ -25,20 +25,16 @@ CLAN_PATH=""
 
 # file to check
 DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/dementia"
 
 DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-15/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/control"
 
 # tier to read
 READ="*PAR"
 
 # create a defaultdict to encode syntax features
-syntax_tokens = defaultdict(lambda:len(syntax_tokens))
-# create a defaultdict to encode relational features
-relational_tokens = defaultdict(lambda:len(relational_tokens))
-# create a defaultdict to encode pos features
-pos_tokens = defaultdict(lambda:len(pos_tokens))
+tokens = defaultdict(lambda:len(tokens))
 
 
 def do(DATADIR, OUTDIR):
@@ -268,9 +264,9 @@ def do(DATADIR, OUTDIR):
 
         # we encode everything the global defaultdict, which will add to the dictionary if it
         # doesn't exist already
-        encoded_syntax_features = [[syntax_tokens[j] for j in i] for i in extracted_syntactic_features]
-        encoded_relational_features = [[relational_tokens[j] for j in i] for i in extracted_relational_features]
-        encoded_pos_features = [[pos_tokens[j] for j in i] for i in extracted_pos_features]
+        encoded_syntax_features = [[tokens[j] for j in i] for i in extracted_syntactic_features]
+        encoded_relational_features = [[tokens[j] for j in i] for i in extracted_relational_features]
+        encoded_pos_features = [[tokens[j] for j in i] for i in extracted_pos_features]
 
         # save the syntax features
         with open(repath_file(checkfile, OUTDIR).replace(".cha", "-meta.bin"), "wb") as df:
@@ -287,9 +283,7 @@ def do(DATADIR, OUTDIR):
         with open(os.path.join(OUTDIR, "tokens.bin"), "wb") as df:
             # dump the frozen syntax features
             # we reverse the dictionary as the typical usage
-            pickle.dump({"syntax": {syntax_tokens[k] : k for k in syntax_tokens},
-                         "relational": {relational_tokens[k] : k for k in relational_tokens},
-                         "pos": {pos_tokens[k] : k for k in pos_tokens}}, df)
+            pickle.dump({"tokens": {tokens[k] : k for k in tokens}}, df)
 
 do(DATADIR_AD, OUTDIR_AD)
 do(DATADIR_C, OUTDIR_C)
