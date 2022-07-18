@@ -43,8 +43,8 @@ CONFIG = {
 }
 
 # set up the run
-# run = wandb.init(project="DBA", entity="jemoka", config=CONFIG)
-run = wandb.init(project="DBA", entity="jemoka", config=CONFIG, mode="disabled")
+run = wandb.init(project="DBA", entity="jemoka", config=CONFIG)
+# run = wandb.init(project="DBA", entity="jemoka", config=CONFIG, mode="disabled")
 
 # get the configuration
 config = run.config
@@ -122,8 +122,7 @@ for e in range(config.epochs):
 
         # log the loss and logits
         run.log({
-            "loss": output["loss"].detach().item(),
-            "logit": output["logit"].squeeze().detach().cpu()
+            "loss": output["loss"].detach().item()
         })
 
         # run a sample of validation, ever 10 items
@@ -137,11 +136,6 @@ for e in range(config.epochs):
             output = model(val_in, label=val_out)
             # log the loss and logits
             run.log({
-                "val_loss": output["loss"].detach().item(),
-                "val_logit": output["logit"].squeeze().detach().cpu()
+                "val_loss": output["loss"].detach().item()
             })
-
-
-
-
 
