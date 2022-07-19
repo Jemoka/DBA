@@ -38,8 +38,8 @@ DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 # initialize the model
 CONFIG = {
     "epochs": 10,
-    "lr": 5e-3,
-    "batch_size": 16
+    "lr": 1e-2,
+    "batch_size": 1
 }
 
 # set up the run
@@ -50,7 +50,7 @@ run = wandb.init(project="DBA", entity="jemoka", config=CONFIG)
 config = run.config
 
 # load dataset dir
-DATASET = "./data/wordinfo/pitt-07-18-syntax.bin"
+DATASET = "./data/wordinfo/pitt-07-18-01-syntax.bin"
 
 # validation samples
 VAL_SAMPLES = 0.1
@@ -74,20 +74,20 @@ test_data_out = torch.tensor(np.array([[i[3]] for i in test_data]))
 # define the model
 class Model(Module):
     # initialize the model
-    def __init__(self, in_dim=1145, out_dim=1):
+    def __init__(self, in_dim=88, out_dim=1):
         # super init
         super().__init__()
         # construct network
-        self.d1 = Linear(in_dim, 1024)
-        self.d2 = Linear(1024, 128)
-        self.d3 = Linear(128, 32)
-        self.d4 = Linear(32, out_dim)
+        self.d1 = Linear(in_dim, 64)
+        self.d2 = Linear(64, 32)
+        self.d3 = Linear(32, 16)
+        self.d4 = Linear(16, out_dim)
 
     # pass through the network
     def forward(self, x, label=None):
         net = F.relu(self.d1(x))
         net = F.relu(self.d2(net))
-        net = torch.tanh(self.d3(net))
+        net = F.relu(self.d3(net))
         net = torch.tanh(self.d4(net))*3 # we multiply to scale the tanh
                                          # to account for the range of outputs
 

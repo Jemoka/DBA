@@ -35,10 +35,12 @@ sns.set_theme()
 import matplotlib.pyplot as plt
 
 # get all dirs
-CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/control/"
-DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/dementia/"
+CONTROL_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/control/"
+DEMENTIA_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/dementia/"
+LOOKUP_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/tokens.bin"
+
 # OUT_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-13.csv"
-LING_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-syntax.bin"
+LING_DIR = "/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01-syntax.bin"
 OUT_DIR = None
 # LING_DIR = None
 
@@ -52,10 +54,9 @@ control_syntax = glob.glob(os.path.join(CONTROL_DIR, "*.bin"))
 dementia_files = glob.glob(os.path.join(DEMENTIA_DIR, "*.csv"))
 dementia_syntax = glob.glob(os.path.join(DEMENTIA_DIR, "*.bin"))
 
-lookup = os.path.join(CONTROL_DIR, "tokens.bin")
 
 # open and parse lookup dictionary
-with open(lookup, 'rb') as df:
+with open(LOOKUP_DIR, 'rb') as df:
     # read the content
     LOOKUP = pickle.load(df)["tokens"]
 
@@ -131,7 +132,6 @@ def process_targets(files, meta):
         # decode the meta output
         with open(s, 'rb') as df:
             meta_parsed = pickle.load(df)
-            syntax_parsed = meta_parsed["syntax"]
             structure_parsed = meta_parsed["relational"]
             pos_parsed = meta_parsed["pos"]
             mmse = meta_parsed["mmse"]
@@ -149,7 +149,6 @@ def process_targets(files, meta):
             "silence_duration": silence_duration,
             "speech_duration": duration,
             "voice_silence_ratio": pause_rate,
-            "syntax": syntax_parsed,
             "structure": structure_parsed,
             "pos": pos_parsed,
             "mmse": mmse
@@ -192,11 +191,10 @@ def encode_seq(x, to):
     res = []
 
     # for each of the utterances
-    for s,t,p in zip(*x[["syntax","structure","pos"]]):
+    for t,p in zip(*x[["structure","pos"]]):
         # create a zero array
         template = np.zeros(to)
         # activate the syntax, structure, and position
-        template[s] = 1
         template[t] = 1
         template[p] = 1
         # append to res
@@ -209,10 +207,10 @@ data["syntactical_features"] = data.apply(lambda x : encode_seq(x, LENGTH), axis
 
 # create 3d syntax, structure, and pos arrays
 # explode mmse
-mmse_exploded = sum(data.apply(lambda x: [x.mmse for _ in range(len(x.syntax))], axis=1),[])
+mmse_exploded = sum(data.apply(lambda x: [x.mmse for _ in range(len(x.pos))], axis=1),[])
 mmse_array = np.array(mmse_exploded)
 mmse_normed = (mmse_array-mmse_array.mean())/mmse_array.std()
-target_exploded = sum(data.apply(lambda x: [x.target for _ in range(len(x.syntax))], axis=1),[])
+target_exploded = sum(data.apply(lambda x: [x.target for _ in range(len(x.pos))], axis=1),[])
 
 # extract final linguistic features
 syntactical_features = list(zip(np.array(sum(data["syntactical_features"].to_list(), [])),
@@ -338,7 +336,7 @@ in_concat = pd.concat([in_copy, test_in_copy])
 out_concat = pd.concat([out_data, out_test])
 
 # count the 
-utterance_count = in_data["syntax"].apply(len)
+utterance_count = in_data["pos"].apply(len)
 
 # define columns to droup
 non_scalar_features = ["verbal_rate_interpolated",
@@ -359,7 +357,6 @@ reg = SVR(kernel="poly")
 reg = reg.fit(in_ling, mmse_ling_norm)
 reg.score(in_test_ling, mmse_test_ling_norm)
 
-reg.predict(in_test_ling)
 # output_test
 
 

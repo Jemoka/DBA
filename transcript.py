@@ -25,10 +25,12 @@ CLAN_PATH=""
 
 # file to check
 DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/dementia"
 
 DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/control"
+
+TOKENDIR="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/tokens.bin"
 
 # tier to read
 READ="*PAR"
@@ -247,7 +249,7 @@ def do(DATADIR, OUTDIR):
         # parse the entire database to generate the equivalent of
         # feature #4 by LubetichSagae which combines #s 2,3,4
         # together
-        extracted_syntactic_features = []
+        # extracted_syntactic_features = []
         extracted_relational_features = []
         extracted_pos_features = []
 
@@ -255,35 +257,36 @@ def do(DATADIR, OUTDIR):
                         # calculate mor line
             mor_line = parse_mor(mor)
                         # calculate feature
-            syntax, relation, pos  = parse_gra(gra, mor_line)
+            _, relation, pos  = parse_gra(gra, mor_line)
 
             # append to list
-            extracted_syntactic_features.append(syntax)
+            # extracted_syntactic_features.append(syntax)
             extracted_relational_features.append(relation)
             extracted_pos_features.append(pos)
 
         # we encode everything the global defaultdict, which will add to the dictionary if it
         # doesn't exist already
-        encoded_syntax_features = [[tokens[j] for j in i] for i in extracted_syntactic_features]
+        # encoded_syntax_features = [[tokens[j] for j in i] for i in extracted_syntactic_features]
         encoded_relational_features = [[tokens[j] for j in i] for i in extracted_relational_features]
         encoded_pos_features = [[tokens[j] for j in i] for i in extracted_pos_features]
 
         # save the syntax features
         with open(repath_file(checkfile, OUTDIR).replace(".cha", "-meta.bin"), "wb") as df:
                         # dump the syntax features
-            pickle.dump({"syntax": encoded_syntax_features,
-                         "relational": encoded_relational_features,
+            pickle.dump({"relational": encoded_relational_features,
                          "pos": encoded_pos_features,
                          "mmse": MMSE}, df)
 
         # write the final output file
         wordframe.to_csv(repath_file(checkfile, OUTDIR).replace(".cha", "-wordframe.csv"))
 
-        # dump the syntax token lookup table
-        with open(os.path.join(OUTDIR, "tokens.bin"), "wb") as df:
-            # dump the frozen syntax features
-            # we reverse the dictionary as the typical usage
-            pickle.dump({"tokens": {tokens[k] : k for k in tokens}}, df)
-
 do(DATADIR_AD, OUTDIR_AD)
 do(DATADIR_C, OUTDIR_C)
+
+# dump the syntax token lookup table
+with open(TOKENDIR, "wb") as df:
+    # dump the frozen syntax features
+    # we reverse the dictionary as the typical usage
+    pickle.dump({"tokens": {tokens[k] : k for k in tokens}}, df)
+
+
