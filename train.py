@@ -8,7 +8,7 @@ import torch
 from torch.optim import AdamW
 from torch.nn.utils.rnn import pack_sequence
 import torch.nn.functional as F
-from torch.nn import Module, Linear, Flatten
+from torch.nn import Module, Linear, Flatten, Dropout
 
 # wandb
 import wandb
@@ -37,14 +37,14 @@ DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 
 # initialize the model
 CONFIG = {
-    "epochs": 10,
+    "epochs": 20,
     "lr": 1e-3,
-    "batch_size": 16
+    "batch_size": 4
 }
 
 # set up the run
-run = wandb.init(project="DBA", entity="jemoka", config=CONFIG)
-# run = wandb.init(project="DBA", entity="jemoka", config=CONFIG, mode="disabled")
+# run = wandb.init(project="DBA", entity="jemoka", config=CONFIG)
+run = wandb.init(project="DBA", entity="jemoka", config=CONFIG, mode="disabled")
 
 # get the configuration
 config = run.config
@@ -81,13 +81,14 @@ class Model(Module):
         self.d1 = Linear(in_dim, 64)
         self.d2 = Linear(64, 32)
         self.d3 = Linear(32, 16)
+        self.do = Dropout(0.3)
         self.d4 = Linear(16, out_dim)
 
     # pass through the network
     def forward(self, x, label=None):
         net = F.relu(self.d1(x))
         net = F.relu(self.d2(net))
-        net = F.relu(self.d3(net))
+        net = self.do(F.relu(self.d3(net)))
         net = torch.tanh(self.d4(net))*3 # we multiply to scale the tanh
                                          # to account for the range of outputs
 
