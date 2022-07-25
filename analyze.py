@@ -18,7 +18,7 @@ from sklearn.svm import SVC, SVR
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, plot_tree
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -297,8 +297,8 @@ pause_stat_results = analyze_variables(data, PAUSE)
 train_data = data.iloc[:-int(TEST_SPLIT*len(data))]
 test_data = data.iloc[-int(TEST_SPLIT*len(data)):]
 
-train_ling = syntactical_features[:-int(TEST_SPLIT*len(linguistic_features))]
-test_ling = syntactical_features[-int(TEST_SPLIT*len(linguistic_features)):]
+train_ling = syntactical_features[:-int(TEST_SPLIT*len(syntactical_features))]
+test_ling = syntactical_features[-int(TEST_SPLIT*len(syntactical_features)):]
 
 # in and out data
 in_data = train_data.drop(columns=["target"])
@@ -353,12 +353,14 @@ non_scalar_features = ["verbal_rate_interpolated",
 # test_features = np.concatenate((test_features, in_test_syntax), axis=1)
 
 # MMSE regression
-reg = SVR(kernel="poly")
+reg = SVR(kernel="rbf")
+reg = reg.fit(in_ling, mmse_ling)
+reg.score(in_test_ling, mmse_test_ling)
+
+# random forest regression
+reg = RandomForestRegressor()
 reg = reg.fit(in_ling, mmse_ling_norm)
 reg.score(in_test_ling, mmse_test_ling_norm)
-
-# output_test
-
 
 # SVC classification
 clsf = SVC(kernel="poly")
@@ -380,8 +382,8 @@ plt.show()
 
 # random classifier test
 clsf = SVC(kernel='poly')
-clsf = clsf.fit(in_data_syntax, out_data)
-clsf.score(in_test_syntax, out_test)
+clsf = clsf.fit(in_ling, target_ling)
+clsf.score(in_test_ling, target_test_ling)
 
 # KNN
 clsf = KNeighborsClassifier(2)

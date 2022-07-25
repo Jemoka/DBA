@@ -24,13 +24,13 @@ repath_file = lambda file_path, new_dir: os.path.join(new_dir, pathlib.Path(file
 CLAN_PATH=""
 
 # file to check
-DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/dementia"
+DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/Lanzi-07-24/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/Lanzi-07-24/dementia"
 
-DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-12/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/control"
+DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/Lanzi-07-24/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/Lanzi-07-24/control"
 
-TOKENDIR="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-18-01/tokens.bin"
+TOKENDIR="/Users/houliu/Documents/Projects/DBA/data/wordinfo/Lanzi-07-24/tokens.bin"
 
 # tier to read
 READ="*PAR"
@@ -74,10 +74,10 @@ def do(DATADIR, OUTDIR):
             for r in res:
                 res_dict[r[2]] = r[4:]
             # and finally, log mmse
-                MMSE = int(res_dict[READ[1:]][-1])
-        except (ValueError, IndexError):
+            MMSE = int(res_dict[READ[1:]][-1])
+        except (ValueError, IndexError, KeyError):
             print(checkfile)
-            continue
+            MMSE=None
 
 
         # conform result with tab-seperated beginnings
@@ -273,9 +273,13 @@ def do(DATADIR, OUTDIR):
         # save the syntax features
         with open(repath_file(checkfile, OUTDIR).replace(".cha", "-meta.bin"), "wb") as df:
                         # dump the syntax features
-            pickle.dump({"relational": encoded_relational_features,
-                         "pos": encoded_pos_features,
-                         "mmse": MMSE}, df)
+            if MMSE:
+                pickle.dump({"relational": encoded_relational_features,
+                            "pos": encoded_pos_features,
+                            "mmse": MMSE}, df)
+            else:
+                pickle.dump({"relational": encoded_relational_features,
+                            "pos": encoded_pos_features}, df)
 
         # write the final output file
         wordframe.to_csv(repath_file(checkfile, OUTDIR).replace(".cha", "-wordframe.csv"))
