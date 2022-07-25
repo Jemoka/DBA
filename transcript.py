@@ -24,13 +24,13 @@ repath_file = lambda file_path, new_dir: os.path.join(new_dir, pathlib.Path(file
 CLAN_PATH=""
 
 # file to check
-DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/Lanzi-07-24/dementia"
-OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/Lanzi-07-24/dementia"
+DATADIR_AD="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-24/dementia"
+OUTDIR_AD="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-24/dementia"
 
-DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/Lanzi-07-24/control"
-OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/Lanzi-07-24/control"
+DATADIR_C="/Users/houliu/Documents/Projects/DBA/data/raw/pitt-07-24/control"
+OUTDIR_C="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-24/control"
 
-TOKENDIR="/Users/houliu/Documents/Projects/DBA/data/wordinfo/Lanzi-07-24/tokens.bin"
+TOKENDIR="/Users/houliu/Documents/Projects/DBA/data/wordinfo/pitt-07-24/tokens.bin"
 
 # tier to read
 READ="*PAR"
@@ -75,10 +75,11 @@ def do(DATADIR, OUTDIR):
                 res_dict[r[2]] = r[4:]
             # and finally, log mmse
             MMSE = int(res_dict[READ[1:]][-1])
+            TYPE = res_dict[READ[1:]][1]
         except (ValueError, IndexError, KeyError):
             print(checkfile)
             MMSE=None
-
+            TYPE=None
 
         # conform result with tab-seperated beginnings
         result = []
@@ -87,7 +88,10 @@ def do(DATADIR, OUTDIR):
             # if the value continues from the last line
             if value[0] == "\t":
                 # pop the result
-                res = result.pop()
+                try: 
+                    res = result.pop()
+                except IndexError:
+                    print(checkfile)
                 # append
                 res = res.strip("\n") + " " + value[1:]
                 # put back
